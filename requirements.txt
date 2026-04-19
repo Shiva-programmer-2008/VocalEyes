@@ -1,0 +1,8 @@
+flask>=3.1.0              # Security patches
+flask-cors>=5.0.0         # CORS improvements
+ultralytics>=8.3.0        # Latest YOLO improvements
+opencv-python>=4.10.0     # Performance & security fixes
+pytesseract>=0.3.13       # Latest OCR enhancements
+numpy>=2.0.0              # Performance boost
+pyttsx3>=2.98             # Bug fixes
+Pillow>=11.0.0            # Security patches

@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VocalEyes AI — Assistive Vision System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d14;
+  --surface: #151520;
+  --surface2: #1c1c2e;
+  --surface3: #23233a;
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.14);
+  --text: #e8e8f0;
+  --text-muted: #7a7a9a;
+  --text-dim: #4a4a6a;
+  --accent: #6c6cf8;
+  --accent-glow: rgba(108,108,248,0.25);
+  --accent-light: #9898fb;
+  --green: #22d3a4;
+  --green-bg: rgba(34,211,164,0.1);
+  --amber: #f59e0b;
+  --amber-bg: rgba(245,158,11,0.1);
+  --red: #f43f5e;
+  --red-bg: rgba(244,63,94,0.1);
+  --blue: #38bdf8;
+  --blue-bg: rgba(56,189,248,0.1);
+  --font: 'DM Sans', sans-serif;
+  --mono: 'Space Mono', monospace;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --sidebar: 280px;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+/* ── TOP NAV ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(13,13,20,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 60px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+
+.nav-eye {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  animation: pulse-ring 2.5s infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.nav-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: blink 1.5s infinite;
+}
+
+.status-dot.off { background: var(--text-dim); animation: none; }
+.status-dot.danger { background: var(--red); }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.nav-actions { display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hover);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover { background: var(--surface2); border-color: var(--border-hover); }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover { background: var(--accent-light); border-color: var(--accent-light); }
+
+.btn-danger {
+  background: var(--red-bg);
+  border-color: rgba(244,63,94,0.3);
+  color: var(--red);
+}
+
+.btn-success {
+  background: var(--green-bg);
+  border-color: rgba(34,211,164,0.3);
+  color: var(--green);
+}
+
+/* ── LAYOUT ── */
+.layout {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+aside {
+  width: var(--sidebar);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+/* ── STAT CARDS ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-light);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.stat-card.danger-card .stat-value { color: var(--red); }
+.stat-card.green-card .stat-value { color: var(--green); }
+
+/* ── CONTROLS ── */
+.control-group { margin-bottom: 14px; }
+
+.control-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+}
+
+.toggle input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface3);
+  border-radius: 22px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+  background: white;
+}
+
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+input[type="range"] {
+  flex: 1;
+  appearance: none;
+  height: 4px;
+  background: var(--surface3);
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.range-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ── TOP OBJECTS ── */
+.top-obj-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.top-obj-bar-wrap {
+  flex: 1;
+  margin: 0 10px;
+  height: 4px;
+  background: var(--surface3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.top-obj-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.top-obj-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── MAIN CONTENT ── */
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+  gap: 16px;
+}
+
+.panel-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.left-panel {
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.resizer {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border);
+}
+
+.resizer:hover {
+  background: var(--accent);
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.icon-camera { background: var(--blue-bg); }
+.icon-upload { background: var(--green-bg); }
+.icon-log { background: var(--amber-bg); }
+
+.panel-body {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+/* ── VIDEO AREA ── */
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #050508;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+video, #live-output {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+}
+
+#live-output {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.video-overlay.hidden { display: none; }
+
+.cam-icon {
+  font-size: 42px;
+  opacity: 0.3;
+}
+
+/* ── DANGER BANNER ── */
+.danger-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--red);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+  animation: flash 0.5s infinite alternate;
+  display: none;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+@keyframes flash {
+  from { opacity: 1; }
+  to { opacity: 0.5; }
+}
+
+/* ── UPLOAD AREA ── */
+.upload-zone {
+  border: 2px dashed var(--border-hover);
+  border-radius: var(--radius-sm);
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin: 16px;
+}
+
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.upload-zone-icon { font-size: 36px; margin-bottom: 8px; }
+.upload-zone p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+#upload-preview-img {
+  width: 100%;
+  display: none;
+  border-radius: var(--radius-sm);
+}
+
+/* ── DETECTION RESULTS ── */
+.results-panel {
+  padding: 12px;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  animation: slide-in 0.2s ease;
+  font-size: 13px;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.badge-high { background: var(--red-bg); color: var(--red); }
+.badge-medium { background: var(--amber-bg); color: var(--amber); }
+.badge-low { background: var(--blue-bg); color: var(--blue); }
+
+.result-dist {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.result-dir {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── EVENT LOG ── */
+.log-wrap {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.log-time {
+  font-family: var(--mono);
+  color: var(--text-dim);
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.log-msg {
+  color: var(--text);
+}
+
+.log-msg.danger { color: var(--red); font-weight: 600; }
+.log-msg.warn { color: var(--amber); }
+
+/* ── BOTTOM BAR ── */
+.bottom-bar {
+  height: 48px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  flex-shrink: 0;
+}
+
+.bottom-mode {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.bottom-fps {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── VOICE FEEDBACK ── */
+.voice-toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface3);
+  border: 1px solid var(--border-hover);
+  border-radius: 30px;
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  z-index: 200;
+  max-width: 400px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── MODAL ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  width: 460px;
+  max-width: 90vw;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body { padding: 20px; }
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  aside { width: 220px; }
+  .panel-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  aside { display: none; }
+  .layout { flex-direction: column; }
+  main { padding: 12px; }
+  .panel-row { grid-template-columns: 1fr; }
+}
+
+/* ── SKIP LINK (accessibility) ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<span class="sr-only">VocalEyes — AI assistive vision system for object detection and navigation assistance</span>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-eye">👁</div>
+    VocalEyes
+    <span style="font-size:11px;color:var(--text-dim);font-weight:400;font-family:var(--mono);">v2.0</span>
+  </div>
+  <div class="nav-status">
+    <div class="status-dot off" id="status-dot"></div>
+    <span id="status-text">STANDBY</span>
+  </div>
+  <div class="nav-actions">
+    <button class="btn" onclick="openSettings()">⚙ Settings</button>
+    <button class="btn" onclick="resetStats()">↺ Reset</button>
+    <button class="btn btn-primary" onclick="startCamera()" id="cam-btn">▶ Start Camera</button>
+  </div>
+</nav>
+
+<div class="layout">
+
+<!-- ── SIDEBAR ── -->
+<aside>
+  <!-- Stats -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Session Stats</div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="s-total">0</div>
+        <div class="stat-label">Detected</div>
+      </div>
+      <div class="stat-card danger-card">
+        <div class="stat-value" id="s-danger">0</div>
+        <div class="stat-label">Danger</div>
+      </div>
+      <div class="stat-card green-card">
+        <div class="stat-value" id="s-fps">—</div>
+        <div class="stat-label">FPS</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-uptime">0s</div>
+        <div class="stat-label">Uptime</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Objects -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Top Objects</div>
+    <div id="top-objects">
+      <div style="font-size:12px;color:var(--text-dim)">No data yet</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="sidebar-section" style="flex:1">
+    <div class="sidebar-label">Controls</div>
+
+    <div class="toggle-row">
+      <span style="font-size:13px">🔊 Voice Feedback</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-voice" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span style="font-size:13px">⚠ Danger Alerts</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-danger" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span style="font-size:13px">📖 OCR / Text</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-ocr">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="control-group" style="margin-top:14px">
+      <span class="control-label">Confidence threshold</span>
+      <div class="range-row">
+        <input type="range" min="10" max="90" value="40" step="5" id="conf-slider"
+          oninput="document.getElementById('conf-val').textContent = this.value + '%'">
+        <span class="range-value" id="conf-val">40%</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">Detection speed</span>
+      <div class="range-row">
+        <input type="range" min="500" max="5000" value="2000" step="500" id="speed-slider"
+          oninput="document.getElementById('speed-val').textContent = (this.value/1000).toFixed(1) + 's'">
+        <span class="range-value" id="speed-val">2.0s</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-success" onclick="startListening()">🎤 Voice Command</button>
+      <button class="btn" onclick="exportLog()">⬇ Export Log</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main>
+  <div class="panel-row">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- LIVE CAMERA -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="panel-icon icon-camera">🎥</div>
+          Live Detection
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" id="stop-btn" onclick="stopCamera()" style="display:none">⏹ Stop</button>
+          <button class="btn btn-primary" id="snap-btn" onclick="takeSnapshot()" style="display:none">📸 Snap</button>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="video-wrapper" id="video-wrapper">
+          <div class="video-overlay" id="video-overlay">
+            <div class="cam-icon">📷</div>
+            <div>Camera not started</div>
+            <div style="font-size:12px">Click Start Camera above</div>
+          </div>
+          <video id="video" autoplay muted playsinline style="display:none"></video>
+          <img id="live-output" alt="Detection output" style="display:none">
+          <div class="danger-banner" id="danger-banner">⚠ DANGER DETECTED</div>
+        </div>
+      </div>
+
+      <div style="padding:12px;border-top:1px solid var(--border)">
+        <div id="live-results" class="results-panel" style="padding:0;max-height:140px;overflow-y:auto"></div>
+      </div>
+    </div>
+
+  </div> <!-- END LEFT PANEL -->
+
+
+  <!-- RESIZER -->
+  <div class="resizer" id="resizer"></div>
+
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <div style="display:flex;flex-direction:column;gap:16px;min-height:0">
+
+      <!-- Upload -->
+      <div class="panel" style="flex:1">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-icon icon-upload">🖼</div>
+            Image Analysis
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="toggleFullscreen()">⛶</button>
+            <button class="btn" onclick="clearUpload()">✕ Clear</button>
+            <button class="btn btn-primary" onclick="analyzeUpload()" id="analyze-btn" disabled>Analyze</button>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div id="upload-zone" class="upload-zone"
+            onclick="document.getElementById('file-input').click()"
+            ondragover="handleDragOver(event)"
+            ondrop="handleDrop(event)"
+            ondragleave="this.classList.remove('dragover')">
+            <div class="upload-zone-icon">📂</div>
+            <strong style="font-size:14px">Drop image or click to browse</strong>
+            <p>JPG, PNG, WEBP supported</p>
+          </div>
+
+          <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+          <img id="upload-preview-img">
+          <div id="upload-results" class="results-panel"></div>
+        </div>
+      </div>
+
+      <!-- ── MAP NAVIGATION ── -->
+      <div class="panel" style="height:280px;flex-shrink:0">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-icon icon-log">🗺️</div>
+            Navigation Map
+          </div>
+        </div>
+
+        <div style="padding:10px;display:flex;gap:8px">
+          <input type="text" id="destination" placeholder="Enter destination..."
+            style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--border)">
+          <button class="btn btn-primary" onclick="navigateTo()">Go</button>
+        </div>
+
+        <div id="map" style="height:200px;"></div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="panel" style="height:200px;flex-shrink:0">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-icon icon-log">📋</div>
+            Event Log
+          </div>
+          <button class="btn" onclick="clearLog()" style="font-size:11px;padding:4px 10px">Clear</button>
+        </div>
+
+        <div class="panel-body">
+          <div class="log-wrap" id="event-log">
+            <div class="log-entry">
+              <span class="log-time">--:--:--</span>
+              <span class="log-msg">VocalEyes v2.0 ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div> <!-- END RIGHT PANEL -->
+
+</div> <!-- END panel-row -->
+
+<!-- ── BOTTOM BAR ── -->
+<div class="bottom-bar">
+  <span class="bottom-mode" id="bottom-mode">Mode: Standby</span>
+  <span class="bottom-fps" id="bottom-fps">Backend: <span id="backend-status">connecting...</span></span>
+</div>
+
+<!-- ── VOICE TOAST ── -->
+<div class="voice-toast" id="voice-toast"></div>
+
+<!-- ── SETTINGS MODAL ── -->
+<div class="modal-backdrop" id="settings-modal">
+  <div class="modal">
+    <div class="modal-header">
+      ⚙ Settings
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-row">
+        <div>
+          <div>Speech rate</div>
+          <div class="setting-sub">Words per minute for text-to-speech</div>
+        </div>
+        <div class="range-row" style="width:140px">
+          <input type="range" min="0.5" max="2" value="1" step="0.1" id="rate-slider"
+            oninput="document.getElementById('rate-val').textContent = parseFloat(this.value).toFixed(1) + 'x'">
+          <span class="range-value" id="rate-val">1.0x</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div>Danger sound alert</div>
+          <div class="setting-sub">Play beep when danger is detected</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-sound" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div>High contrast UI</div>
+          <div class="setting-sub">Increase text size and contrast</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-hc" onchange="toggleHighContrast(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div>Show confidence scores</div>
+          <div class="setting-sub">Display model confidence per detection</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-conf-show" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+let stream = null;
+let isDetecting = false;
+let isProcessing = false;
+let detectionInterval = null;
+let fpsFrames = 0;
+let fpsStart = Date.now();
+let sessionStart = Date.now();
+let totalDetections = 0;
+let dangerCount = 0;
+let topObjects = {};
+let eventLog = [];
+let speechRate = 1.0;
+let lastSpokenText = '';
+let lastSpokenTime = 0;
+
+// ════════════════════════════════════════════
+//  BACKEND HEALTH CHECK
+// ════════════════════════════════════════════
+async function checkBackend() {
+  try {
+    const r = await fetch('/health', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('backend-status').textContent = 'Connected ✓';
+      document.getElementById('backend-status').style.color = 'var(--green)';
+    }
+  } catch {
+    document.getElementById('backend-status').textContent = 'Offline — run app.py';
+    document.getElementById('backend-status').style.color = 'var(--red)';
+  }
+}
+
+// ════════════════════════════════════════════
+//  STATS
+// ════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('s-total').textContent = totalDetections;
+  document.getElementById('s-danger').textContent = dangerCount;
+
+  const uptime = Math.floor((Date.now() - sessionStart) / 1000);
+  const mins = Math.floor(uptime / 60);
+  const secs = uptime % 60;
+  document.getElementById('s-uptime').textContent = mins > 0 ? `${mins}m${secs}s` : `${secs}s`;
+
+  // Top objects
+  const sorted = Object.entries(topObjects).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const max = sorted[0]?.[1] || 1;
+  const container = document.getElementById('top-objects');
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">No data yet</div>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(([name, count]) => `
+    <div class="top-obj-row">
+      <span style="font-size:12px;color:var(--text);min-width:60px">${name}</span>
+      <div class="top-obj-bar-wrap">
+        <div class="top-obj-bar" style="width:${Math.round(count/max*100)}%"></div>
+      </div>
+      <span class="top-obj-count">${count}</span>
+    </div>
+  `).join('');
+}
+
+setInterval(updateStats, 1000);
+
+// ════════════════════════════════════════════
+//  FPS TRACKER
+// ════════════════════════════════════════════
+function tickFPS() {
+  fpsFrames++;
+  const elapsed = (Date.now() - fpsStart) / 1000;
+  if (elapsed >= 3) {
+    const fps = (fpsFrames / elapsed).toFixed(1);
+    document.getElementById('s-fps').textContent = fps;
+    fpsFrames = 0;
+    fpsStart = Date.now();
+  }
+}
+
+// ════════════════════════════════════════════
+//  EVENT LOG
+// ════════════════════════════════════════════
+function addLog(msg, type = 'normal') {
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-GB', { hour12: false });
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-msg ${type}">${msg}</span>
+  `;
+
+  const log = document.getElementById('event-log');
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+
+  if (log.children.length > 80) log.removeChild(log.firstChild);
+  eventLog.push({ time, msg, type });
+}
+
+function clearLog() {
+  document.getElementById('event-log').innerHTML = '';
+  eventLog = [];
+}
+
+// ════════════════════════════════════════════
+//  VOICE
+// ════════════════════════════════════════════
+const synth = window.speechSynthesis;
+
+function speak(text) {
+  if (!document.getElementById('toggle-voice').checked) return;
+
+  const normalized = text.split(', ').sort().join(', ');
+  if (normalized === lastSpokenText && Date.now() - lastSpokenTime < 3000) return;
+
+  lastSpokenText = normalized;
+  lastSpokenTime = Date.now();
+
+  synth.cancel();
+
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = speechRate;
+  utt.pitch = 1;
+  synth.speak(utt);
+
+  showToast(text);
+}
+function smartSpeak(text) {
+  if (!document.getElementById('toggle-voice').checked) return;
+
+  // PRIORITY SYSTEM
+  if (text.toLowerCase().includes("collision")) {
+    synth.cancel(); // interrupt everything
+    speak("⚠️ " + text);
+    return;
+  }
+
+  if (text.toLowerCase().includes("stop")) {
+    synth.cancel();
+    speak(text);
+    return;
+  }
+
+  if (text.toLowerCase().includes("move")) {
+    speak(text);
+    return;
+  }
+
+  // Avoid spam
+  if (Date.now() - lastSpokenTime < 2000) return;
+
+  speak(text);
+}
+
+function showToast(text) {
+  const t = document.getElementById('voice-toast');
+  t.textContent = '🔊 ' + text;
+  t.classList.add('visible');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('visible'), 3000);
+}
+
+function playBeep() {
+  if (!document.getElementById('toggle-sound')?.checked) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
+// ════════════════════════════════════════════
+//  STATUS
+// ════════════════════════════════════════════
+function setStatus(text, state = 'off') {
+  document.getElementById('status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot ' + (state === 'on' ? '' : state === 'danger' ? 'danger' : 'off');
+  document.getElementById('bottom-mode').textContent = 'Mode: ' + text;
+}
+
+// ════════════════════════════════════════════
+//  RENDER RESULTS
+// ════════════════════════════════════════════
+function renderResults(container, results, showConf) {
+  container.innerHTML = '';
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:8px">No objects detected</div>';
+    return;
+  }
+
+  let hasDanger = false;
+
+  results.forEach(r => {
+    const prio = (r.priority || 'LOW').toUpperCase();
+    const isDanger = prio === 'HIGH' && ['very near','near'].includes(r.distance || '');
+    if (isDanger) hasDanger = true;
+
+    totalDetections++;
+    if (isDanger) dangerCount++;
+    topObjects[r.label] = (topObjects[r.label] || 0) + 1;
+
+    const conf = showConf && r.confidence ? ` (${Math.round(r.confidence * 100)}%)` : '';
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.innerHTML = `
+      <span class="result-badge badge-${prio.toLowerCase()}">${prio}</span>
+      <span>${r.label}${conf}</span>
+      <span class="result-dir">${r.direction || ''}</span>
+      <span class="result-dist">${r.distance || ''}</span>
+    `;
+    container.appendChild(item);
+  });
+
+  // Danger banner
+  const banner = document.getElementById('danger-banner');
+  if (banner) {
+    banner.style.display = hasDanger ? 'block' : 'none';
+    if (hasDanger && document.getElementById('toggle-danger').checked) {
+      playBeep();
+      setStatus('DANGER', 'danger');
+    }
+  }
+}
+
+// ════════════════════════════════════════════
+//  CAMERA
+// ════════════════════════════════════════════
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+    });
+
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    video.style.display = 'block';
+
+    document.getElementById('video-overlay').classList.add('hidden');
+    document.getElementById('live-output').style.display = 'block';
+    document.getElementById('stop-btn').style.display = 'inline-flex';
+    document.getElementById('snap-btn').style.display = 'inline-flex';
+    document.getElementById('cam-btn').style.display = 'none';
+
+    isDetecting = true;
+    setStatus('LIVE DETECTION', 'on');
+    addLog('Camera started', 'normal');
+
+    const interval = parseInt(document.getElementById('speed-slider').value);
+    detectionInterval = setInterval(runDetection, interval);
+
+  } catch (err) {
+    addLog('Camera error: ' + err.message, 'danger');
+    alert('Camera access denied or not available.');
+  }
+}
+
+function stopCamera() {
+  isDetecting = false;
+  clearInterval(detectionInterval);
+
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+
+  document.getElementById('video').style.display = 'none';
+  document.getElementById('video').srcObject = null;
+  document.getElementById('live-output').style.display = 'none';
+  document.getElementById('live-output').src = '';
+  document.getElementById('video-overlay').classList.remove('hidden');
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('snap-btn').style.display = 'none';
+  document.getElementById('cam-btn').style.display = 'inline-flex';
+  document.getElementById('danger-banner').style.display = 'none';
+
+  setStatus('STANDBY', 'off');
+  addLog('Camera stopped');
+}
+
+async function runDetection() {
+  if (!stream || !isDetecting || isProcessing) return;
+  isProcessing = true;
+
+  try {
+    const video = document.getElementById('video');
+    const canvas = document.createElement('canvas');
+    canvas.width = 416;
+    canvas.height = 416;
+    canvas.getContext('2d').drawImage(video, 0, 0, 416, 416);
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+
+    const res = await fetch('/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataURL })
+    });
+
+    if (!res.ok) throw new Error('Detection failed');
+    const data = await res.json();
+
+    document.getElementById('live-output').src = data.image;
+
+    const showConf = document.getElementById('toggle-conf-show').checked;
+    const container = document.getElementById('live-results');
+    renderResults(container, data.results, showConf);
+
+    // Voice
+    if (data.results && data.results.length > 0) {
+      const important = data.results.filter(r =>
+        ['HIGH','MEDIUM'].includes((r.priority || '').toUpperCase())
+      );
+      if (important.length > 0) {
+        const text = important.map(r => r.sentence || `${r.label} ${r.distance} ${r.direction}`).join('. ');
+        smartSpeak(text);
+        addLog(text, important.some(r => r.priority === 'HIGH') ? 'danger' : 'warn');
+      }
+    }
+
+    tickFPS();
+  } catch (err) {
+    addLog('Detection error: ' + err.message, 'danger');
+  } finally {
+    isProcessing = false;
+  }
+}
+
+// ════════════════════════════════════════════
+//  SNAPSHOT
+// ════════════════════════════════════════════
+function takeSnapshot() {
+  const img = document.getElementById('live-output');
+  if (!img.src || img.src === window.location.href) return;
+  const a = document.createElement('a');
+  a.href = img.src;
+  a.download = `vocaleyes_snap_${Date.now()}.jpg`;
+  a.click();
+  addLog('Snapshot saved');
+}
+
+// ════════════════════════════════════════════
+//  UPLOAD
+// ════════════════════════════════════════════
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadPreview(file);
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) loadPreview(file);
+}
+
+function loadPreview(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('upload-preview-img');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('analyze-btn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearUpload() {
+  document.getElementById('upload-preview-img').style.display = 'none';
+  document.getElementById('upload-preview-img').src = '';
+  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('upload-results').innerHTML = '';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('file-input').value = '';
+}
+
+async function analyzeUpload() {
+  const input = document.getElementById('file-input');
+  if (!input.files[0]) return;
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+  addLog('Analyzing uploaded image...');
+
+  const formData = new FormData();
+  formData.append('image', input.files[0]);
+
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    document.getElementById('upload-preview-img').src = data.image;
+
+    const showConf = document.getElementById('toggle-conf-show').checked;
+    renderResults(document.getElementById('upload-results'), data.results, showConf);
+
+    addLog(`Found ${data.count} object(s) in image`);
+
+    if (data.results && data.results.length > 0) {
+      const text = data.results.map(r => r.sentence || r.label).join('. ');
+      smartSpeak(text);
+    }
+  } catch (err) {
+    addLog('Upload error: ' + err.message, 'danger');
+    alert('Error connecting to backend. Make sure app.py is running.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze';
+  }
+}
+
+// ════════════════════════════════════════════
+//  VOICE COMMANDS
+// ════════════════════════════════════════════
+function startListening() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    addLog('Voice commands not supported in this browser', 'warn');
+    return;
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+
+  recognition.onresult = e => {
+    const cmd = e.results[0][0].transcript.toLowerCase();
+    addLog(`Voice command: "${cmd}"`);
+
+    if (cmd.includes('start')) { startCamera(); smartSpeak('Starting camera'); }
+    else if (cmd.includes('stop')) { stopCamera(); smartSpeak('Camera stopped'); }
+    else if (cmd.includes('analyze') || cmd.includes('scan')) { analyzeUpload(); }
+    else if (cmd.includes('reset')) { resetStats(); smartSpeak('Stats reset'); }
+    else if (cmd.includes('voice off')) {
+      document.getElementById('toggle-voice').checked = false;
+    } else if (cmd.includes('voice on')) {
+      document.getElementById('toggle-voice').checked = true;
+    } else {
+      speak("Command not recognized. Say start, stop, analyze, or reset.");
+    }
+  };
+
+  recognition.onerror = e => addLog('Voice error: ' + e.error, 'warn');
+  recognition.start();
+  addLog('Listening for voice command...');
+  showToast('🎤 Listening...');
+}
+
+// ════════════════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════════════════
+function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+
+document.getElementById('rate-slider').addEventListener('input', e => {
+  speechRate = parseFloat(e.target.value);
+});
+
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('settings-modal')) closeSettings();
+});
+
+function toggleHighContrast(on) {
+  if (on) {
+    document.documentElement.style.setProperty('--text', '#ffffff');
+    document.documentElement.style.setProperty('--text-muted', '#cccccc');
+    document.body.style.fontSize = '16px';
+  } else {
+    document.documentElement.style.removeProperty('--text');
+    document.documentElement.style.removeProperty('--text-muted');
+    document.body.style.fontSize = '';
+  }
+}
+
+// ════════════════════════════════════════════
+//  STATS RESET
+// ════════════════════════════════════════════
+async function resetStats() {
+  totalDetections = 0;
+  dangerCount = 0;
+  topObjects = {};
+  sessionStart = Date.now();
+  fpsFrames = 0;
+  fpsStart = Date.now();
+  document.getElementById('s-fps').textContent = '—';
+  updateStats();
+  addLog('Stats reset');
+  try { await fetch('/reset_stats', { method: 'POST' }); } catch {}
+}
+
+// ════════════════════════════════════════════
+//  EXPORT LOG
+// ════════════════════════════════════════════
+function exportLog() {
+  const text = eventLog.map(e => `[${e.time}] ${e.msg}`).join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vocaleyes_log_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+// ════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 's') startCamera();
+  if (e.key === 'x') stopCamera();
+  if (e.key === 'v') document.getElementById('toggle-voice').click();
+  if (e.key === 'Escape') closeSettings();
+});
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+checkBackend();
+addLog('System initialized. Keyboard: S = start, X = stop, V = toggle voice');
+
+
+const resizer = document.getElementById('resizer');
+const leftPanel = document.querySelector('.left-panel');
+
+let isResizing = false;
+
+resizer.addEventListener('mousedown', () => isResizing = true);
+
+document.addEventListener('mousemove', (e) => {
+  if (!isResizing) return;
+  const newWidth = (e.clientX / window.innerWidth) * 100;
+  leftPanel.style.width = newWidth + '%';
+});
+
+document.addEventListener('mouseup', () => isResizing = false);
+
+function toggleFullscreen() {
+  const elem = document.querySelector('.video-wrapper');
+
+  if (!document.fullscreenElement) {
+    elem.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+// ════════════════════════════════════════════
+// 🗺️ GPS + MAP NAVIGATION (FINAL CLEAN VERSION)
+// ════════════════════════════════════════════
+
+let map, marker, routeLine;
+let userLat = null, userLng = null;
+
+// Navigation control
+let navigationInterval = null;
+let stepIndex = 0;
+let currentSteps = [];
+
+// ─────────────────────────────
+// 🗺️ INIT MAP
+// ─────────────────────────────
+function initMap(lat, lng) {
+  map = L.map('map').setView([lat, lng], 16);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  marker = L.marker([lat, lng]).addTo(map)
+    .bindPopup("You are here")
+    .openPopup();
+}
+
+// ─────────────────────────────
+// 📍 GPS TRACKING
+// ─────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) {
+    addLog("GPS not supported", "danger");
+    return;
+  }
+
+  navigator.geolocation.watchPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+
+    if (!map) {
+      initMap(userLat, userLng);
+    } else {
+      marker.setLatLng([userLat, userLng]);
+      map.setView([userLat, userLng]);
+    }
+
+  }, err => {
+    addLog("GPS error: " + err.message, "danger");
+  }, {
+    enableHighAccuracy: true
+  });
+}
+
+// ─────────────────────────────
+// 🔊 STEP NAVIGATION
+// ─────────────────────────────
+function speakNextStep() {
+  if (stepIndex >= currentSteps.length) return;
+
+  const step = currentSteps[stepIndex];
+  const instruction = step.maneuver.instruction;
+  const distance = Math.round(step.distance);
+
+  // Skip useless instructions
+  if (!instruction.toLowerCase().includes("continue")) {
+    smartSpeak(`${instruction} in ${distance} meters`);
+  }
+
+  stepIndex++;
+}
+
+// ─────────────────────────────
+// 🛣️ NAVIGATE TO DESTINATION
+// ─────────────────────────────
+async function navigateTo() {
+  const dest = document.getElementById("destination").value;
+
+  if (!dest || !userLat) {
+    alert("Enter destination and allow GPS");
+    return;
+  }
+
+  try {
+    // ── Convert place → coordinates
+    const geoRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${dest}`
+    );
+    const geoData = await geoRes.json();
+
+    if (!geoData.length) {
+      alert("Location not found");
+      return;
+    }
+
+    const destLat = geoData[0].lat;
+    const destLng = geoData[0].lon;
+
+    // ── Get route (walking)
+    const routeRes = await fetch(
+      `https://router.project-osrm.org/route/v1/walking/${userLng},${userLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`
+    );
+
+    const routeData = await routeRes.json();
+
+    const coords = routeData.routes[0].geometry.coordinates;
+    const latlngs = coords.map(c => [c[1], c[0]]);
+
+    // ── Remove old route
+    if (routeLine) {
+      map.removeLayer(routeLine);
+    }
+
+    // ── Draw new route
+    routeLine = L.polyline(latlngs, { color: '#6c6cf8' }).addTo(map);
+    map.fitBounds(routeLine.getBounds());
+
+    smartSpeak("Route loaded. Start moving.");
+
+    // ── Store steps
+    currentSteps = routeData.routes[0].legs[0].steps;
+    stepIndex = 0;
+
+    // ── Clear previous interval
+    if (navigationInterval) {
+      clearInterval(navigationInterval);
+    }
+
+    // ── Start navigation loop
+    navigationInterval = setInterval(() => {
+      speakNextStep();
+    }, 6000);
+
+  } catch (err) {
+    addLog("Navigation error: " + err.message, "danger");
+  }
+}
+
+// ─────────────────────────────
+// 🚀 AUTO START GPS SAFELY
+// ─────────────────────────────
+window.onload = () => {
+  startGPS();
+};
+</script>
+</body>
+</html>
