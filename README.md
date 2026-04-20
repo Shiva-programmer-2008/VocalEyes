@@ -1,4 +1,4 @@
-# 👁️ VocalEyes v2.0
+# 👁️ VocalEyes 
 
 **AI-Powered Assistive Vision System for the Visually Impaired**
 
@@ -383,9 +383,8 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ## 📞 Contact & Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/VocalEyes/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/VocalEyes/discussions)
-- **Email:** your.email@example.com
+- **Issues:** [GitHub Issues](https://github.com/Shiva-Programmer-2008/VocalEyes/issues)
+- **Email:** 23BTRCL258@jainuniversity.ac.in
 
 ---
 
@@ -417,6 +416,6 @@ If VocalEyes helps you or someone you know, please consider:
 
 **Made with ❤️ for accessibility**
 
-[Report Bug](https://github.com/yourusername/VocalEyes/issues) · [Request Feature](https://github.com/yourusername/VocalEyes/issues) · [Documentation](https://github.com/yourusername/VocalEyes/wiki)
+[Report Bug](https://github.com/Shiva-Programmer-2008/VocalEyes/issues) 
 
 </div>
